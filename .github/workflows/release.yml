@@ -1,0 +1,78 @@
+# Builds the one-file executable on Linux and macOS (PyInstaller can't cross-compile). Windows is left out until the
+# tests pass there (path separators).
+# Run it by hand from the Actions tab to get the builds as run artifacts; push a v* tag to also publish a Release.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  # The in-browser player and Mermaid, fetched once with the versions pinned in the Makefile.
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: make vendor
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vendor
+          path: tidyarr/web/vendor/
+
+  build:
+    needs: vendor
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04  # the oldest glibc we build against is the oldest the binary runs on
+            asset: tidyarr-linux-x86_64
+          - os: macos-14
+            asset: tidyarr-macos-arm64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: vendor
+          path: tidyarr/web/vendor/
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+          activate-environment: true
+      - run: uv pip sync requirements.txt
+      - run: python -m pytest
+      # Same options as `make build`, with relative paths (no --specpath).
+      - run: >
+          pyinstaller --onefile --clean --noconfirm --name tidyarr --paths .
+          --add-data tidyarr/web:tidyarr/web --collect-data guessit --collect-all babelfish
+          scripts/serve.py
+      - name: Rename and smoke test
+        run: |
+          mkdir out
+          mv dist/tidyarr* "out/${{ matrix.asset }}"
+          "out/${{ matrix.asset }}" --help
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.asset }}
+          path: out/${{ matrix.asset }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: tidyarr-*
+          path: out
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

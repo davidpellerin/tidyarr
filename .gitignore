@@ -1,0 +1,23 @@
+# Python environment and caches
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets and local config
+.env
+*.local
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local state written by the app when run from source (decisions, etc.)
+data/
+
+# In-browser player and Mermaid, fetched by `make serve` or `make build`
+tidyarr/web/vendor/
+
+# PyInstaller output (`make build`)
+build/
+dist/

@@ -1,0 +1,9 @@
+# What the project uses directly; requirements.txt pins these and everything they need (`make lock` to update it).
+pytest          # runs the tests in tests/
+fastapi         # the review web UI
+uvicorn         # serves it
+httpx           # FastAPI's test client
+guessit         # parses release filenames
+send2trash      # puts cleaned-up leftovers in the system trash
+watchfiles     # restarts the server on code changes (`make dev`)
+pyinstaller     # bundles the app into one executable (`make build`)
